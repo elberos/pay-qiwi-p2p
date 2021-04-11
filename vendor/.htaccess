@@ -1,0 +1,6 @@
+ErrorDocument 403 /error.html
+
+<FilesMatch "\.(php|sql|twig)$">
+	Order Allow,Deny
+	Deny from all
+</FilesMatch>
