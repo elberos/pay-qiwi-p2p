@@ -21,20 +21,75 @@
  *  limitations under the License.
  */
 
-if ( !class_exists( 'PAY_P2P_QIWI_Plugin' ) ) 
+if ( !class_exists( 'PAY_QIWI_P2P_Plugin' ) ) 
 {
 
-class PAY_P2P_QIWI_Plugin
+class PAY_QIWI_P2P_Plugin
 {
-	static $QIWI_PUBLIC_KEY = "";
-	static $QIWI_SECRET_KEY = "";
-	
 	
 	/**
 	 * Init Plugin
 	 */
 	public static function init()
 	{
+		add_action
+		(
+			'admin_init', 
+			function()
+			{
+				require_once __DIR__ . "/include/admin-settings.php";
+				require_once __DIR__ . "/include/admin-transactions.php";
+			}
+		);
+		add_action('admin_menu', 'PAY_QIWI_P2P_Plugin::register_admin_menu');
+		
+		/* Remove plugin updates */
+		add_filter( 'site_transient_update_plugins', 'PAY_QIWI_P2P_Plugin::filter_plugin_updates' );
+	}
+	
+	
+	
+	/**
+	 * Remove plugin updates
+	 */
+	public static function filter_plugin_updates($value)
+	{
+		$name = plugin_basename(__FILE__);
+		if (isset($value->response[$name]))
+		{
+			unset($value->response[$name]);
+		}
+		return $value;
+	}
+	
+	
+	
+	/**
+	 * Register Admin Menu
+	 */
+	public static function register_admin_menu()
+	{
+		add_menu_page(
+			'qiwi-p2p', 'QIWI P2P',
+			'manage_options', 'qiwi-p2p',
+			function ()
+			{
+				echo "Qiwi";
+			},
+			'/wp-content/plugins/pay-qiwi-p2p/images/qiwi.png',
+			100
+		);
+		
+		add_submenu_page(
+			'qiwi-p2p',
+			'Настройки', 'Настройки',
+			'manage_options', 'elberos-forms-data',
+			function()
+			{
+				\Elberos\QIWI\P2P\Settings::show();
+			}
+		);
+		
 	}
 	
 	
@@ -49,7 +104,7 @@ class PAY_P2P_QIWI_Plugin
 		pay_p2p_qiwi_load();
 		
 		$gmtime_expire = gmdate('Y-m-d H:i:s', time());
-		$table_site_transactions = $wpdb->prefix . 'pay_p2p_qiwi_transactions';
+		$table_site_transactions = $wpdb->prefix . 'pay_qiwi_p2p_transactions';
 		$sql = $wpdb->prepare
 		(
 			"select * from $table_site_transactions where invoice_id=%d and gmtime_expire>%s and status='WAITING'",
@@ -78,7 +133,8 @@ class PAY_P2P_QIWI_Plugin
 		];
 		
 		/* Create qiwi form */
-		$billPayments = new \Qiwi\Api\BillPayments(static::$QIWI_SECRET_KEY);
+		$secret_key = get_option( 'qiwi_p2p_secret_key', '' );
+		$billPayments = new \Qiwi\Api\BillPayments($secret_key);
 		$response = $billPayments->createBill($billId, $fields);
 		
 		if ($response != null)
@@ -124,7 +180,7 @@ class PAY_P2P_QIWI_Plugin
 }
 
 
-PAY_P2P_QIWI_Plugin::init();
+PAY_QIWI_P2P_Plugin::init();
 
 function pay_p2p_qiwi_load()
 {
