@@ -70,20 +70,20 @@ class PAY_QIWI_P2P_Plugin
 	public static function register_admin_menu()
 	{
 		add_menu_page(
-			'qiwi-p2p', 'QIWI P2P',
-			'manage_options', 'qiwi-p2p',
+			'pay-qiwi-p2p', 'QIWI P2P',
+			'manage_options', 'pay-qiwi-p2p',
 			function ()
 			{
-				echo "Qiwi";
+				\Elberos\QIWI\P2P\Transactions::show();
 			},
 			'/wp-content/plugins/pay-qiwi-p2p/images/qiwi.png',
 			100
 		);
 		
 		add_submenu_page(
-			'qiwi-p2p',
+			'pay-qiwi-p2p',
 			'Настройки', 'Настройки',
-			'manage_options', 'elberos-forms-data',
+			'manage_options', 'pay-qiwi-p2p-settings',
 			function()
 			{
 				\Elberos\QIWI\P2P\Settings::show();
@@ -97,7 +97,7 @@ class PAY_QIWI_P2P_Plugin
 	/**
 	 * Create transaction
 	 */
-	public static function create_transaction($invoice_id, $amount, $currency, $comment)
+	public static function create_transaction($invoice_type, $invoice_id, $amount, $currency, $comment)
 	{
 		global $wpdb;
 		
@@ -150,11 +150,13 @@ class PAY_QIWI_P2P_Plugin
 			(
 				"INSERT INTO $table_site_transactions
 				(
-					uid, status, invoice_id, pay_url, gmtime_add, gmtime_expire, fields, answer
+					uid, status, invoice_type, invoice_id, pay_url,
+					gmtime_add, gmtime_expire, fields, answer,
+					amount, currency, comment
 				) 
-				VALUES( %s, %s, %d, %s, %s, %s, %s, %s)",
+				VALUES(%s, %s, %s, %d, %s, %s, %s, %s, %s, %d, %s, %s)",
 				[
-					$billId, $status, $invoice_id, $pay_url, $gmtime_add, $expiration_dbtime,
+					$billId, $status, $invoice_type, $invoice_id, $pay_url, $gmtime_add, $expiration_dbtime,
 					json_encode($fields),
 					json_encode($response),
 				]
