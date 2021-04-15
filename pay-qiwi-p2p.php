@@ -102,12 +102,10 @@ class PAY_QIWI_P2P_Plugin
 						static::cidr_match($remote_ip, "91.232.230.0/23") ||
 						static::cidr_match($remote_ip, "91.213.51.0/24")
 					;
-					/*
 					if (!$check_ip_flag)
 					{
 						return "";
 					}
-					*/
 					
 					$table_log = $wpdb->prefix . 'pay_qiwi_p2p_log';
 					$table_transactions = $wpdb->prefix . 'pay_qiwi_p2p_transactions';
@@ -118,20 +116,22 @@ class PAY_QIWI_P2P_Plugin
 					
 					$text = file_get_contents("php://input");
 					$data = @json_decode($text, true);
+					$data_bill = isset($data['bill']) ? $data['bill'] : null;
+					//var_dump($data);
 					
-					if ($data != null and isset($data['status']) and isset($data['status']['value']))
+					if ($data_bill != null and isset($data_bill['status']) and isset($data_bill['status']['value']))
 					{
-						$status_value = $data['status']['value'];
+						$status_value = $data_bill['status']['value'];
 					}
-					if ($status_value == 'PAID' and $data != null and isset($data['status']) and
-						isset($data['status']['datetime']))
+					if ($status_value == 'PAID' and $data_bill != null and isset($data_bill['status']) and
+						isset($data_bill['status']['changedDateTime']))
 					{
-						$dt = strtotime($data['status']['datetime']);
+						$dt = strtotime($data_bill['status']['changedDateTime']);
 						$gmtime_pay = gmdate('Y-m-d H:i:s', $dt);
 					}
-					if ($data != null and isset($data['billId']))
+					if ($data_bill != null and isset($data_bill['billId']))
 					{
-						$uid = $data['billId'];
+						$uid = $data_bill['billId'];
 					}
 					
 					// Insert log
