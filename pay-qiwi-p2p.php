@@ -48,6 +48,13 @@ class PAY_QIWI_P2P_Plugin
 		
 		/* Add qiwi entry point */
 		add_action('elberos_register_routes', 'PAY_QIWI_P2P_Plugin::register_routes');
+		
+		/* Add cron task */
+		if ( !wp_next_scheduled( 'pay_qiwi_p2p_hourly_event' ) )
+		{
+			wp_schedule_event( time() + 60, 'hourly', 'pay_qiwi_p2p_hourly_event' );
+		}
+		add_action( 'pay_qiwi_p2p_hourly_event', 'PAY_QIWI_P2P_Plugin::cron_hourly_event' );
 	}
 	
 	
@@ -320,6 +327,25 @@ class PAY_QIWI_P2P_Plugin
 		return null;
 	}
 	
+	
+	
+	/**
+	 * Cron hourly event
+	 */
+	public static function cron_hourly_event()
+	{
+		global $wpdb;
+		
+		/* Отменим просроченные инвойсы */
+		$gmtime_expire = gmdate('Y-m-d H:i:s', time());
+		$table_invoice = $wpdb->prefix . 'pay_qiwi_p2p_transactions';
+		$sql = $wpdb->prepare
+		(
+			"UPDATE `$table_invoice` set `status`='EXPIRED' where `status`='WAITING' and `gmtime_expire`<%s",
+			$gmtime_expire
+		);
+		$wpdb->query($sql);
+	}
 }
 
 
