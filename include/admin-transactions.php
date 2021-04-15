@@ -196,6 +196,9 @@ class Transactions_Table extends \WP_List_Table
 				<select name="status" class="web_form_value">
 					<option value="">Статус</option>
 					<option value="WAITING" <?= $status==="WAITING"?"selected":"" ?> >WAITING</option>
+					<option value="PAID" <?= $status==="PAID"?"selected":"" ?> >PAID</option>
+					<option value="REJECTED" <?= $status==="REJECTED"?"selected":"" ?> >REJECTED</option>
+					<option value="EXPIRED" <?= $status==="EXPIRED"?"selected":"" ?> >EXPIRED</option>
 				</select>
 				<input type="button" class="button dosearch" value="Поиск">
 			</span>
