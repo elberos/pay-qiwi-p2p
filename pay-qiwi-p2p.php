@@ -157,6 +157,9 @@ class PAY_QIWI_P2P_Plugin
 						]
 					);
 					
+					/* Get created log id */
+					$log_id = $wpdb->insert_id;
+					
 					if (!$check_ip_flag)
 					{
 						return "";
@@ -180,6 +183,14 @@ class PAY_QIWI_P2P_Plugin
 					
 					// Do action
 					do_action('pay_qiwi_p2p_change_status', $qiwi_transaction);
+					
+					// Update log
+					$sql = $wpdb->prepare
+					(
+						"UPDATE `$table_log` set `status`=1 where `id`=%d",
+						$log_id
+					);
+					$wpdb->query($sql);
 					
 					return "";
 				},
