@@ -109,13 +109,17 @@ class PAY_QIWI_P2P_Plugin
 						static::cidr_match($remote_ip, "91.232.230.0/23") ||
 						static::cidr_match($remote_ip, "91.213.51.0/24")
 					;
+					if (defined("PAY_QIWI_P2P_DEBUG") and PAY_QIWI_P2P_DEBUG)
+					{
+						$check_ip_flag = true;
+					}
 					if (!$check_ip_flag)
 					{
 						return "";
 					}
 					
-					$table_log = $wpdb->prefix . 'pay_qiwi_p2p_log';
-					$table_transactions = $wpdb->prefix . 'pay_qiwi_p2p_transactions';
+					$table_log = $wpdb->base_prefix . 'pay_qiwi_p2p_log';
+					$table_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
 					$gmtime_add = gmdate('Y-m-d H:i:s', time());
 					$gmtime_pay = null;
 					$uid = "";
@@ -176,7 +180,7 @@ class PAY_QIWI_P2P_Plugin
 					// Get transaction
 					$sql = $wpdb->prepare
 					(
-						"select * from $table_transactions where uid=%s",
+						"select * from $table_transactions where uid=%s limit 1",
 						$uid
 					);
 					$qiwi_transaction = $wpdb->get_row($sql, ARRAY_A);
@@ -255,7 +259,7 @@ class PAY_QIWI_P2P_Plugin
 		pay_p2p_qiwi_load();
 		
 		$expiration_dbtime = gmdate('Y-m-d H:i:s', time());
-		$table_site_transactions = $wpdb->prefix . 'pay_qiwi_p2p_transactions';
+		$table_site_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
 		$sql = $wpdb->prepare
 		(
 			"select * from $table_site_transactions where invoice_id=%d and gmtime_expire>%s and status='WAITING'",
@@ -349,7 +353,7 @@ class PAY_QIWI_P2P_Plugin
 		
 		/* Отменим просроченные инвойсы */
 		$gmtime_expire = gmdate('Y-m-d H:i:s', time());
-		$table_invoice = $wpdb->prefix . 'pay_qiwi_p2p_transactions';
+		$table_invoice = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
 		$sql = $wpdb->prepare
 		(
 			"UPDATE `$table_invoice` set `status`='EXPIRED' where `status`='WAITING' and `gmtime_expire`<%s",

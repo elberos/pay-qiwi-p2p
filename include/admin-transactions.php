@@ -52,7 +52,7 @@ class Transactions_Table extends \WP_List_Table
 	function get_table_name()
 	{
 		global $wpdb;
-		return $wpdb->prefix . 'pay_qiwi_p2p_transactions';
+		return $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
 	}
 		
 	// Вывод значений по умолчанию

@@ -29,12 +29,30 @@ class Settings
 	
 	public static function update_key($key, $value)
 	{
-		if (!add_option($key, $value, "", "no"))
+		if ( ! is_multisite() )
 		{
-			update_option($key, $value);
+			if (!add_option($key, $value, "", "no"))
+			{
+				update_option($key, $value);
+			}
+		}
+		else
+		{
+			if (!add_network_option(1, $key, $value, "", "no"))
+			{
+				update_network_option(1, $key, $value);
+			}
 		}
 	}
 	
+	public static function get_key($key, $value)
+	{
+		if ( ! is_multisite() )
+		{
+			return get_option(1, $key, $value);
+		}
+		return get_network_option(1, $key, $value);
+	}
 	
 	public static function show()
 	{
@@ -50,8 +68,8 @@ class Settings
 				
 		$item = 
 		[
-			'qiwi_p2p_public_key' => get_option( 'qiwi_p2p_public_key', '' ),
-			'qiwi_p2p_secret_key' => get_option( 'qiwi_p2p_secret_key', '' ),
+			'qiwi_p2p_public_key' => static::get_key( 'qiwi_p2p_public_key', '' ),
+			'qiwi_p2p_secret_key' => static::get_key( 'qiwi_p2p_secret_key', '' ),
 		];
 		
 		?>
