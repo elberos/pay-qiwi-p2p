@@ -100,6 +100,12 @@ class Settings
 	{
 		?>
 		
+		<p>
+		    <label for="qiwi_p2p_url"><?php _e('URL:', 'pay-qiwi-p2p')?></label>
+		<br>
+            <?= site_url("/wp-json/pay_qiwi_p2p") ?>
+		</p>
+		
 		<!-- Public key -->
 		<p>
 		    <label for="qiwi_p2p_public_key"><?php _e('Public key:', 'pay-qiwi-p2p')?></label>
