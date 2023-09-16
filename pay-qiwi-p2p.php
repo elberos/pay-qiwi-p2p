@@ -113,10 +113,12 @@ class PAY_QIWI_P2P_Plugin
 					{
 						$check_ip_flag = true;
 					}
+					/*
 					if (!$check_ip_flag)
 					{
 						return "";
 					}
+					*/
 					
 					$table_log = $wpdb->base_prefix . 'pay_qiwi_p2p_log';
 					$table_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
@@ -130,11 +132,18 @@ class PAY_QIWI_P2P_Plugin
 					$data_bill = isset($data['bill']) ? $data['bill'] : null;
 					//var_dump($data);
 					
-					if ($data_bill != null and isset($data_bill['status']) and isset($data_bill['status']['value']))
+					if (
+						$data_bill != null and
+						isset($data_bill['status']) and
+						isset($data_bill['status']['value'])
+					)
 					{
 						$status_value = $data_bill['status']['value'];
 					}
-					if ($status_value == 'PAID' and $data_bill != null and isset($data_bill['status']) and
+					if (
+						$status_value == 'PAID' and
+						$data_bill != null and
+						isset($data_bill['status']) and
 						isset($data_bill['status']['changedDateTime']))
 					{
 						$dt = strtotime($data_bill['status']['changedDateTime']);
@@ -262,7 +271,8 @@ class PAY_QIWI_P2P_Plugin
 		$table_site_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
 		$sql = $wpdb->prepare
 		(
-			"select * from $table_site_transactions where invoice_id=%d and gmtime_expire>%s and status='WAITING'",
+			"select * from $table_site_transactions
+				where invoice_id=%d and gmtime_expire>%s and status='WAITING'",
 			$invoice_id, $expiration_dbtime
 		);
 		$qiwi_transaction = $wpdb->get_row($sql, ARRAY_A);
@@ -304,7 +314,8 @@ class PAY_QIWI_P2P_Plugin
 			$pay_url = "";
 			
 			if (isset($response['payUrl'])) $pay_url = $response['payUrl'];
-			if (isset($response['status']) and isset($response['status']['value'])) $status = $response['status']['value'];
+			if (isset($response['status']) and isset($response['status']['value']))
+				$status = $response['status']['value'];
 			
 			/* Create transaction */
 			$wpdb->insert
@@ -350,6 +361,88 @@ class PAY_QIWI_P2P_Plugin
 	public static function cron_hourly_event()
 	{
 		global $wpdb;
+		
+		pay_p2p_qiwi_load();
+		
+		$secret_key = get_option( 'qiwi_p2p_secret_key', '' );
+		
+		/* Чекаем неоплаченные инвойсы */
+		$table_site_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
+		$sql = $wpdb->prepare
+		(
+			"select * from $table_site_transactions
+			where status='WAITING' and
+			(gmtime_last_check is null or gmtime_last_check<%s)
+			order by gmtime_last_check asc limit 10",
+			gmdate('Y-m-d H:i:s', time() - 2*60*60)
+		);
+		$qiwi_transactions = $wpdb->get_results($sql, ARRAY_A);
+		
+		foreach ($qiwi_transactions as $item)
+		{
+			$gmtime_last_check = gmdate('Y-m-d H:i:s', time());
+			
+			$billPayments = new \Qiwi\Api\BillPayments($secret_key);
+			$response = $billPayments->getBillInfo($item['uid']);
+			
+			if ($response)
+			{
+				$status_value = "";
+				$gmtime_pay = gmdate('Y-m-d H:i:s', time());
+				
+				if (
+					isset($response['status']) and
+					isset($response['status']['value'])
+				)
+				{
+					$status_value = $response['status']['value'];
+					if (
+						$status_value == 'PAID' and
+						isset($response['status']) and
+						isset($response['status']['changedDateTime'])
+					)
+					{
+						$dt = strtotime($response['status']['changedDateTime']);
+						$gmtime_pay = gmdate('Y-m-d H:i:s', $dt);
+						
+						$wpdb->update(
+							$table_site_transactions,
+							[
+								'status' => $status_value,
+								'gmtime_pay' => $gmtime_pay,
+								'gmtime_last_check' => $gmtime_last_check,
+							],
+							[
+								'invoice_id' => $item['invoice_id'],
+							]
+						);
+						
+						// Get transaction
+						$sql = $wpdb->prepare
+						(
+							"select * from $table_site_transactions where invoice_id=%d limit 1",
+							$item['invoice_id']
+						);
+						$qiwi_transaction = $wpdb->get_row($sql, ARRAY_A);
+						
+						// Do action
+						do_action('pay_qiwi_p2p_change_status', $qiwi_transaction);
+					}
+				}
+				
+				sleep(1);
+			}
+			
+			$wpdb->update(
+				$table_site_transactions,
+				[
+					'gmtime_last_check' => $gmtime_last_check,
+				],
+				[
+					'invoice_id' => $item['invoice_id'],
+				]
+			);
+		}
 		
 		/* Отменим просроченные инвойсы */
 		$gmtime_expire = gmdate('Y-m-d H:i:s', time());
