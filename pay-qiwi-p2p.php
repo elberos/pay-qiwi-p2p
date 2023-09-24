@@ -261,7 +261,8 @@ class PAY_QIWI_P2P_Plugin
 	/**
 	 * Create transaction
 	 */
-	public static function create_transaction($invoice_type, $invoice_id, $amount, $currency, $comment, $gmtime_expire)
+	public static function create_transaction
+	($invoice_type, $invoice_id, $amount, $currency, $comment, $gmtime_expire)
 	{
 		global $wpdb;
 		
@@ -354,6 +355,93 @@ class PAY_QIWI_P2P_Plugin
 	}
 	
 	
+	/**
+	 * Check transaction by id
+	 */
+	public static function check_transaction($tx_id)
+	{
+		global $wpdb;
+		
+		$table_site_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
+		$gmtime_last_check = gmdate('Y-m-d H:i:s', time());
+		
+		// Get transaction
+		$sql = $wpdb->prepare
+		(
+			"select * from $table_site_transactions where id=%d limit 1",
+			$tx_id
+		);
+		$item = $wpdb->get_row($sql, ARRAY_A);
+		
+		/* Если статус не в ожидании, то проверять ненадо */
+		if ($item == null) return $item;
+		if ($item['status'] != 'WAITING') return $item;
+		
+		$secret_key = get_option( 'qiwi_p2p_secret_key', '' );
+		$billPayments = new \Qiwi\Api\BillPayments($secret_key);
+		$response = $billPayments->getBillInfo($item['uid']);
+		
+		if ($response)
+		{
+			$status_value = "";
+			$gmtime_pay = gmdate('Y-m-d H:i:s', time());
+			
+			if (
+				isset($response['status']) and
+				isset($response['status']['value'])
+			)
+			{
+				$status_value = $response['status']['value'];
+				if (
+					$status_value == 'PAID' and
+					isset($response['status']) and
+					isset($response['status']['changedDateTime'])
+				)
+				{
+					$dt = strtotime($response['status']['changedDateTime']);
+					$gmtime_pay = gmdate('Y-m-d H:i:s', $dt);
+					
+					$wpdb->update(
+						$table_site_transactions,
+						[
+							'status' => $status_value,
+							'gmtime_pay' => $gmtime_pay,
+							'gmtime_last_check' => $gmtime_last_check,
+						],
+						[
+							'id' => $item['id'],
+						]
+					);
+					
+					// Get transaction
+					$sql = $wpdb->prepare
+					(
+						"select * from $table_site_transactions where id=%d limit 1",
+						$item['id']
+					);
+					$item = $wpdb->get_row($sql, ARRAY_A);
+					
+					// Do action
+					do_action('pay_qiwi_p2p_change_status', $item);
+				}
+			}
+		}
+		
+		/* Обновляем gmtime_last_check */
+		$wpdb->update(
+			$table_site_transactions,
+			[
+				'gmtime_last_check' => $gmtime_last_check,
+			],
+			[
+				'id' => $item['id'],
+			]
+		);
+		$item['gmtime_last_check'] = $gmtime_last_check;
+		
+		return $item;
+	}
+	 
 	
 	/**
 	 * Cron hourly event
@@ -363,8 +451,6 @@ class PAY_QIWI_P2P_Plugin
 		global $wpdb;
 		
 		pay_p2p_qiwi_load();
-		
-		$secret_key = get_option( 'qiwi_p2p_secret_key', '' );
 		
 		/* Чекаем неоплаченные инвойсы */
 		$table_site_transactions = $wpdb->base_prefix . 'pay_qiwi_p2p_transactions';
@@ -380,68 +466,8 @@ class PAY_QIWI_P2P_Plugin
 		
 		foreach ($qiwi_transactions as $item)
 		{
-			$gmtime_last_check = gmdate('Y-m-d H:i:s', time());
-			
-			$billPayments = new \Qiwi\Api\BillPayments($secret_key);
-			$response = $billPayments->getBillInfo($item['uid']);
-			
-			if ($response)
-			{
-				$status_value = "";
-				$gmtime_pay = gmdate('Y-m-d H:i:s', time());
-				
-				if (
-					isset($response['status']) and
-					isset($response['status']['value'])
-				)
-				{
-					$status_value = $response['status']['value'];
-					if (
-						$status_value == 'PAID' and
-						isset($response['status']) and
-						isset($response['status']['changedDateTime'])
-					)
-					{
-						$dt = strtotime($response['status']['changedDateTime']);
-						$gmtime_pay = gmdate('Y-m-d H:i:s', $dt);
-						
-						$wpdb->update(
-							$table_site_transactions,
-							[
-								'status' => $status_value,
-								'gmtime_pay' => $gmtime_pay,
-								'gmtime_last_check' => $gmtime_last_check,
-							],
-							[
-								'invoice_id' => $item['invoice_id'],
-							]
-						);
-						
-						// Get transaction
-						$sql = $wpdb->prepare
-						(
-							"select * from $table_site_transactions where invoice_id=%d limit 1",
-							$item['invoice_id']
-						);
-						$qiwi_transaction = $wpdb->get_row($sql, ARRAY_A);
-						
-						// Do action
-						do_action('pay_qiwi_p2p_change_status', $qiwi_transaction);
-					}
-				}
-				
-				sleep(1);
-			}
-			
-			$wpdb->update(
-				$table_site_transactions,
-				[
-					'gmtime_last_check' => $gmtime_last_check,
-				],
-				[
-					'invoice_id' => $item['invoice_id'],
-				]
-			);
+			static::check_transaction($item['id']);
+			sleep(1);
 		}
 		
 		/* Отменим просроченные инвойсы */
